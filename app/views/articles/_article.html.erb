@@ -1,0 +1,44 @@
+<div id="<%= dom_id article %>">
+  <p>
+    <strong>Artno:</strong>
+    <%= article.artno %>
+  </p>
+
+  <p>
+    <strong>Artname:</strong>
+    <%= article.artname %>
+  </p>
+
+<% if action_name != "index" %>
+  <p>
+    <strong>Price1:</strong>
+    <%= article.price1 %>
+  </p>
+
+  <p>
+    <strong>Loc price:</strong>
+    <%= article.loc_price %>
+  </p>
+
+  <p>
+    <strong>Slid h:</strong>
+    <%= article.slid_h %>
+  </p>
+
+  <p>
+    <strong>Ssd:</strong>
+    <%= article.SSD %>
+  </p>
+
+  <p>
+    <strong>Eds:</strong>
+    <%= article.EDS %>
+  </p>
+
+  <p>
+    <strong>Store:</strong>
+    <%= article.store_id %>
+  </p>
+<% end %>
+
+</div>

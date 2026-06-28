@@ -1,0 +1,29 @@
+<p style="color: green"><%= notice %></p>
+
+<h1>Articles</h1>
+
+<!-- app/views/users/index.html.erb -->
+<%= form_with url: import_store_articles_path(params[:store_id]), multipart: true, local: true do |form| %>
+  <div class="form-group">
+    <%= form.label :file, "Upload your CSV File:" %>
+    <%= form.file_field :file, accept: '.csv' %> <!-- accept limits browser picker to CSV files -->
+  </div>
+  <%= form.submit "Import CSV" %>
+<% end %>
+
+<div class="row">
+
+  <% @articles.each do |article| %>
+  <div class="card col-2">
+    <%= render article %>
+    <p>
+      <%= link_to "Show this article", article %>
+    </p>
+    </div>
+  <% end %>
+
+
+
+
+</div>
+<%= link_to "New article", new_store_article_path %>

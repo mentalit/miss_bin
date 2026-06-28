@@ -1,0 +1,21 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  artno: 1
+  artname: MyString
+  price1: 1.5
+  loc_price: 1.5
+  slid_h: MyString
+  SSD: 2026-06-28
+  EDS: 2026-06-28
+  store: one
+
+two:
+  artno: 1
+  artname: MyString
+  price1: 1.5
+  loc_price: 1.5
+  slid_h: MyString
+  SSD: 2026-06-28
+  EDS: 2026-06-28
+  store: two

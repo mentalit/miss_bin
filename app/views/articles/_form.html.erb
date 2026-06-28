@@ -1,0 +1,57 @@
+<%= form_with(model: [ @store, article]) do |form| %>
+  <% if article.errors.any? %>
+    <div style="color: red">
+      <h2><%= pluralize(article.errors.count, "error") %> prohibited this article from being saved:</h2>
+
+      <ul>
+        <% article.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= form.label :artno, style: "display: block" %>
+    <%= form.number_field :artno %>
+  </div>
+
+  <div>
+    <%= form.label :artname, style: "display: block" %>
+    <%= form.text_field :artname %>
+  </div>
+
+  <div>
+    <%= form.label :price1, style: "display: block" %>
+    <%= form.text_field :price1 %>
+  </div>
+
+  <div>
+    <%= form.label :loc_price, style: "display: block" %>
+    <%= form.text_field :loc_price %>
+  </div>
+
+  <div>
+    <%= form.label :slid_h, style: "display: block" %>
+    <%= form.text_field :slid_h %>
+  </div>
+
+  <div>
+    <%= form.label :SSD, style: "display: block" %>
+    <%= form.date_field :SSD %>
+  </div>
+
+  <div>
+    <%= form.label :EDS, style: "display: block" %>
+    <%= form.date_field :EDS %>
+  </div>
+
+  <div>
+    <%= form.label :store_id, style: "display: block" %>
+    <%= form.text_field :store_id %>
+  </div>
+
+  <div>
+    <%= form.submit %>
+  </div>
+<% end %>
