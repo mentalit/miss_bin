@@ -7,7 +7,7 @@
     <span class="badge bg-secondary fs-6"><%= @index + 1 %> / <%= @total %></span>
   </div>
   <div class="progress mb-3" style="height: 6px;">
-    <div class="progress-bar" id="progress_bar" style="width: <%= ((@index.to_f / @total) * 100).round %>%"></div>
+    <div class="progress-bar" style="width: <%= ((@index.to_f / @total) * 100).round %>%"></div>
   </div>
 
   <%# Current location card %>
@@ -30,14 +30,18 @@
     </div>
   </div>
 
-  <%# Countdown bar %>
-  <div id="auto_panel" style="display:none;" class="mb-3">
+  <%# Hidden camera elements — not shown to user %>
+  <video id="camera_feed" autoplay playsinline muted style="display:none;"></video>
+  <canvas id="capture_canvas" style="display:none;"></canvas>
+
+  <%# Countdown bar — shown in auto mode %>
+  <div id="auto_panel" class="mb-3">
     <div class="d-flex justify-content-between align-items-center mb-1">
       <small class="text-muted">Next scan in <span id="countdown">5</span>s</small>
-      <small class="text-muted" id="mismatch_counter"></small>
+      <small class="text-danger fw-bold" id="mismatch_counter"></small>
     </div>
     <div class="progress" style="height: 8px;">
-      <div id="countdown_bar" class="progress-bar bg-info" style="width: 100%; transition: none;"></div>
+      <div id="countdown_bar" class="progress-bar bg-info" style="width:100%;"></div>
     </div>
   </div>
 
@@ -54,16 +58,11 @@
 
   <%# Controls %>
   <div class="d-grid gap-2">
-    <%# Auto/Manual toggle %>
-    <div class="btn-group w-100" role="group">
-      <button id="auto_btn" class="btn btn-success btn-lg active">⏱ Auto (5s)</button>
+    <div class="btn-group w-100">
+      <button id="auto_btn"   class="btn btn-success btn-lg">⏱ Auto (5s)</button>
       <button id="manual_btn" class="btn btn-outline-secondary btn-lg">👆 Manual</button>
     </div>
-
-    <%# Manual scan button — hidden in auto mode %>
     <button id="scan_btn" class="btn btn-primary btn-lg" style="display:none;">📷 Scan Now</button>
-
-    <%# Always available %>
     <div class="d-flex gap-2">
       <%= link_to "⏭ Skip", skip_store_scans_path(@store),
             class: "btn btn-outline-secondary btn-sm flex-fill",
@@ -75,37 +74,58 @@
 </div>
 
 <script type="module">
-  const storeId       = <%= @store.id %>;
-  const csrf          = document.querySelector('meta[name="csrf-token"]').content;
-  const INTERVAL      = 5000; // ms
+  const storeId      = <%= @store.id %>;
+  const csrf         = document.querySelector('meta[name="csrf-token"]').content;
+  const INTERVAL     = 5000;
 
-  const autoBtn       = document.getElementById("auto_btn");
-  const manualBtn     = document.getElementById("manual_btn");
-  const scanBtn       = document.getElementById("scan_btn");
-  const autoPanel     = document.getElementById("auto_panel");
-  const countdownEl   = document.getElementById("countdown");
-  const countdownBar  = document.getElementById("countdown_bar");
-  const resultFlash   = document.getElementById("result_flash");
-  const resultHdr     = document.getElementById("result_header");
-  const resultBody    = document.getElementById("result_body");
-  const errorBanner   = document.getElementById("error_banner");
-  const mismatchCtr   = document.getElementById("mismatch_counter");
+  const video        = document.getElementById("camera_feed");
+  const canvas       = document.getElementById("capture_canvas");
+  const autoBtn      = document.getElementById("auto_btn");
+  const manualBtn    = document.getElementById("manual_btn");
+  const scanBtn      = document.getElementById("scan_btn");
+  const autoPanel    = document.getElementById("auto_panel");
+  const countdownEl  = document.getElementById("countdown");
+  const countdownBar = document.getElementById("countdown_bar");
+  const resultFlash  = document.getElementById("result_flash");
+  const resultHdr    = document.getElementById("result_header");
+  const resultBody   = document.getElementById("result_body");
+  const errorBanner  = document.getElementById("error_banner");
+  const mismatchCtr  = document.getElementById("mismatch_counter");
 
   let autoMode      = true;
   let scanning      = false;
   let timer         = null;
-  let countdownTimer = null;
+  let tickTimer     = null;
   let mismatchCount = 0;
-  let secondsLeft   = INTERVAL / 1000;
+
+  // ── Start camera (hidden — only used for capture) ──
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      video.srcObject = stream;
+      await new Promise(resolve => video.addEventListener("loadedmetadata", resolve, { once: true }));
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+    } catch (err) {
+      showError("Camera error: " + err.message);
+    }
+  }
+
+  // ── Capture frame from hidden video → base64 ──
+  function captureBase64() {
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Strip the data:image/jpeg;base64, prefix
+    return canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+  }
 
   // ── Mode toggle ──
   autoBtn.addEventListener("click", () => {
     if (autoMode) return;
     autoMode = true;
-    autoBtn.classList.add("active");
-    autoBtn.classList.replace("btn-outline-success", "btn-success");
-    manualBtn.classList.remove("active");
-    manualBtn.classList.replace("btn-secondary", "btn-outline-secondary");
+    autoBtn.className   = "btn btn-success btn-lg";
+    manualBtn.className = "btn btn-outline-secondary btn-lg";
     scanBtn.style.display  = "none";
     autoPanel.style.display = "block";
     startCountdown();
@@ -115,15 +135,15 @@
     if (!autoMode) return;
     autoMode = false;
     stopCountdown();
-    manualBtn.classList.add("active");
-    manualBtn.classList.replace("btn-outline-secondary", "btn-secondary");
-    autoBtn.classList.remove("active");
-    autoBtn.classList.replace("btn-success", "btn-outline-success");
+    manualBtn.className = "btn btn-secondary btn-lg";
+    autoBtn.className   = "btn btn-outline-success btn-lg";
     scanBtn.style.display   = "block";
     autoPanel.style.display = "none";
   });
 
-  // Space bar fires scan in either mode
+  scanBtn.addEventListener("click", () => { if (!scanning) doScan(); });
+
+  // Spacebar fires in either mode
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && !scanning) {
       e.preventDefault();
@@ -132,40 +152,34 @@
     }
   });
 
-  scanBtn.addEventListener("click", () => { if (!scanning) doScan(); });
-
   // ── Countdown ──
   function startCountdown() {
-    secondsLeft = INTERVAL / 1000;
+    let secondsLeft = INTERVAL / 1000;
     countdownEl.textContent = secondsLeft;
     countdownBar.style.transition = "none";
     countdownBar.style.width = "100%";
 
-    // Animate bar smoothly
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        countdownBar.style.transition = `width ${INTERVAL}ms linear`;
-        countdownBar.style.width = "0%";
-      });
-    });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      countdownBar.style.transition = `width ${INTERVAL}ms linear`;
+      countdownBar.style.width = "0%";
+    }));
 
-    countdownTimer = setInterval(() => {
+    tickTimer = setInterval(() => {
       secondsLeft--;
       countdownEl.textContent = secondsLeft;
-      if (secondsLeft <= 0) clearInterval(countdownTimer);
     }, 1000);
 
-    timer = setTimeout(() => { doScan(); }, INTERVAL);
+    timer = setTimeout(doScan, INTERVAL);
   }
 
   function stopCountdown() {
     clearTimeout(timer);
-    clearInterval(countdownTimer);
+    clearInterval(tickTimer);
     countdownBar.style.transition = "none";
     countdownBar.style.width = "100%";
   }
 
-  // ── Scan ──
+  // ── Main scan ──
   async function doScan() {
     if (scanning) return;
     scanning = true;
@@ -174,10 +188,17 @@
     resultFlash.style.display = "none";
 
     try {
+      const image = captureBase64();
+
       const res  = await fetch(`/stores/${storeId}/scans/capture`, {
         method:  "POST",
-        headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" }
+        headers: {
+          "X-CSRF-Token": csrf,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ image })
       });
+
       const data = await res.json();
 
       if (!res.ok) {
@@ -191,7 +212,7 @@
 
       if (!data.match) {
         mismatchCount++;
-        mismatchCtr.textContent = `${mismatchCount} mismatch${mismatchCount === 1 ? "" : "es"} recorded`;
+        mismatchCtr.textContent = `⚠ ${mismatchCount} mismatch${mismatchCount === 1 ? "" : "es"}`;
       }
 
       if (data.done) {
@@ -209,8 +230,7 @@
 
   function showResult(data) {
     resultFlash.style.display = "block";
-    const unreadable = data.confidence === "unreadable";
-    if (unreadable) {
+    if (data.confidence === "unreadable") {
       resultHdr.textContent      = "⚠️ Unreadable — recorded";
       resultHdr.style.background = "#fd7e14";
     } else if (data.match) {
@@ -231,7 +251,7 @@
     errorBanner.style.display = "block";
   }
 
-  // ── Start in auto mode ──
-  autoPanel.style.display = "block";
+  // ── Init ──
+  await startCamera();
   startCountdown();
 </script>
