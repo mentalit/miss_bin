@@ -1,0 +1,237 @@
+<%# app/views/scans/scan.html.erb %>
+<div class="container py-3" style="max-width: 600px;">
+
+  <%# Progress %>
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0">Scanning locations</h5>
+    <span class="badge bg-secondary fs-6"><%= @index + 1 %> / <%= @total %></span>
+  </div>
+  <div class="progress mb-3" style="height: 6px;">
+    <div class="progress-bar" id="progress_bar" style="width: <%= ((@index.to_f / @total) * 100).round %>%"></div>
+  </div>
+
+  <%# Current location card %>
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row">
+        <div class="col">
+          <div class="text-muted small">Location</div>
+          <div class="font-monospace fs-3 fw-bold"><%= @slid_h %></div>
+        </div>
+        <div class="col">
+          <div class="text-muted small">Expected Art No</div>
+          <div class="font-monospace fs-3 fw-bold"><%= @article&.artno || "—" %></div>
+        </div>
+      </div>
+      <% if @article %>
+        <hr class="my-2">
+        <div class="text-muted small"><%= @article.artname %></div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Countdown bar %>
+  <div id="auto_panel" style="display:none;" class="mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <small class="text-muted">Next scan in <span id="countdown">5</span>s</small>
+      <small class="text-muted" id="mismatch_counter"></small>
+    </div>
+    <div class="progress" style="height: 8px;">
+      <div id="countdown_bar" class="progress-bar bg-info" style="width: 100%; transition: none;"></div>
+    </div>
+  </div>
+
+  <%# Result flash %>
+  <div id="result_flash" style="display:none;" class="card border-0 mb-3">
+    <div id="result_header" class="card-header text-white fw-bold text-center fs-5"></div>
+    <div class="card-body py-2">
+      <dl class="row mb-0 small" id="result_body"></dl>
+    </div>
+  </div>
+
+  <%# Error banner %>
+  <div id="error_banner" class="alert alert-warning" style="display:none;"></div>
+
+  <%# Controls %>
+  <div class="d-grid gap-2">
+    <%# Auto/Manual toggle %>
+    <div class="btn-group w-100" role="group">
+      <button id="auto_btn" class="btn btn-success btn-lg active">⏱ Auto (5s)</button>
+      <button id="manual_btn" class="btn btn-outline-secondary btn-lg">👆 Manual</button>
+    </div>
+
+    <%# Manual scan button — hidden in auto mode %>
+    <button id="scan_btn" class="btn btn-primary btn-lg" style="display:none;">📷 Scan Now</button>
+
+    <%# Always available %>
+    <div class="d-flex gap-2">
+      <%= link_to "⏭ Skip", skip_store_scans_path(@store),
+            class: "btn btn-outline-secondary btn-sm flex-fill",
+            data: { turbo: false } %>
+      <%= link_to "🏁 End & See Results", results_store_scans_path(@store),
+            class: "btn btn-outline-dark btn-sm flex-fill" %>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  const storeId       = <%= @store.id %>;
+  const csrf          = document.querySelector('meta[name="csrf-token"]').content;
+  const INTERVAL      = 5000; // ms
+
+  const autoBtn       = document.getElementById("auto_btn");
+  const manualBtn     = document.getElementById("manual_btn");
+  const scanBtn       = document.getElementById("scan_btn");
+  const autoPanel     = document.getElementById("auto_panel");
+  const countdownEl   = document.getElementById("countdown");
+  const countdownBar  = document.getElementById("countdown_bar");
+  const resultFlash   = document.getElementById("result_flash");
+  const resultHdr     = document.getElementById("result_header");
+  const resultBody    = document.getElementById("result_body");
+  const errorBanner   = document.getElementById("error_banner");
+  const mismatchCtr   = document.getElementById("mismatch_counter");
+
+  let autoMode      = true;
+  let scanning      = false;
+  let timer         = null;
+  let countdownTimer = null;
+  let mismatchCount = 0;
+  let secondsLeft   = INTERVAL / 1000;
+
+  // ── Mode toggle ──
+  autoBtn.addEventListener("click", () => {
+    if (autoMode) return;
+    autoMode = true;
+    autoBtn.classList.add("active");
+    autoBtn.classList.replace("btn-outline-success", "btn-success");
+    manualBtn.classList.remove("active");
+    manualBtn.classList.replace("btn-secondary", "btn-outline-secondary");
+    scanBtn.style.display  = "none";
+    autoPanel.style.display = "block";
+    startCountdown();
+  });
+
+  manualBtn.addEventListener("click", () => {
+    if (!autoMode) return;
+    autoMode = false;
+    stopCountdown();
+    manualBtn.classList.add("active");
+    manualBtn.classList.replace("btn-outline-secondary", "btn-secondary");
+    autoBtn.classList.remove("active");
+    autoBtn.classList.replace("btn-success", "btn-outline-success");
+    scanBtn.style.display   = "block";
+    autoPanel.style.display = "none";
+  });
+
+  // Space bar fires scan in either mode
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && !scanning) {
+      e.preventDefault();
+      if (autoMode) stopCountdown();
+      doScan();
+    }
+  });
+
+  scanBtn.addEventListener("click", () => { if (!scanning) doScan(); });
+
+  // ── Countdown ──
+  function startCountdown() {
+    secondsLeft = INTERVAL / 1000;
+    countdownEl.textContent = secondsLeft;
+    countdownBar.style.transition = "none";
+    countdownBar.style.width = "100%";
+
+    // Animate bar smoothly
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        countdownBar.style.transition = `width ${INTERVAL}ms linear`;
+        countdownBar.style.width = "0%";
+      });
+    });
+
+    countdownTimer = setInterval(() => {
+      secondsLeft--;
+      countdownEl.textContent = secondsLeft;
+      if (secondsLeft <= 0) clearInterval(countdownTimer);
+    }, 1000);
+
+    timer = setTimeout(() => { doScan(); }, INTERVAL);
+  }
+
+  function stopCountdown() {
+    clearTimeout(timer);
+    clearInterval(countdownTimer);
+    countdownBar.style.transition = "none";
+    countdownBar.style.width = "100%";
+  }
+
+  // ── Scan ──
+  async function doScan() {
+    if (scanning) return;
+    scanning = true;
+    stopCountdown();
+    errorBanner.style.display = "none";
+    resultFlash.style.display = "none";
+
+    try {
+      const res  = await fetch(`/stores/${storeId}/scans/capture`, {
+        method:  "POST",
+        headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || `Error ${res.status}`);
+        scanning = false;
+        if (autoMode) startCountdown();
+        return;
+      }
+
+      showResult(data);
+
+      if (!data.match) {
+        mismatchCount++;
+        mismatchCtr.textContent = `${mismatchCount} mismatch${mismatchCount === 1 ? "" : "es"} recorded`;
+      }
+
+      if (data.done) {
+        setTimeout(() => { window.location = `/stores/${storeId}/scans/results`; }, 1500);
+      } else {
+        setTimeout(() => { window.location = `/stores/${storeId}/scans/scan`; }, 1200);
+      }
+
+    } catch (err) {
+      showError("Network error: " + err.message);
+      scanning = false;
+      if (autoMode) startCountdown();
+    }
+  }
+
+  function showResult(data) {
+    resultFlash.style.display = "block";
+    const unreadable = data.confidence === "unreadable";
+    if (unreadable) {
+      resultHdr.textContent      = "⚠️ Unreadable — recorded";
+      resultHdr.style.background = "#fd7e14";
+    } else if (data.match) {
+      resultHdr.textContent      = "✅ Match";
+      resultHdr.style.background = "#198754";
+    } else {
+      resultHdr.textContent      = "❌ Mismatch — recorded";
+      resultHdr.style.background = "#dc3545";
+    }
+    resultBody.innerHTML = `
+      <dt class="col-5">Expected</dt><dd class="col-7 font-monospace">${data.expected ?? "—"}</dd>
+      <dt class="col-5">Detected</dt><dd class="col-7 font-monospace">${data.detected ?? "—"}</dd>
+    `;
+  }
+
+  function showError(msg) {
+    errorBanner.textContent   = msg;
+    errorBanner.style.display = "block";
+  }
+
+  // ── Start in auto mode ──
+  autoPanel.style.display = "block";
+  startCountdown();
+</script>

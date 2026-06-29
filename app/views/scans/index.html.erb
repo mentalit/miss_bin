@@ -1,0 +1,48 @@
+<%# app/views/scans/index.html.erb %>
+<div class="container py-4" style="max-width: 500px;">
+  <h2>Location Scanner</h2>
+  <p class="text-muted">Enter a range of locations to scan.</p>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label fw-bold">From (slid_h)</label>
+        <input type="text" id="from_input" class="form-control form-control-lg font-monospace"
+               placeholder="220100" maxlength="6" autocomplete="off">
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-bold">To (slid_h)</label>
+        <input type="text" id="to_input" class="form-control form-control-lg font-monospace"
+               placeholder="226911" maxlength="6" autocomplete="off">
+      </div>
+      <div class="d-grid">
+        <button id="start_btn" class="btn btn-primary btn-lg">Start Scanning</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  const startBtn  = document.getElementById("start_btn");
+  const fromInput = document.getElementById("from_input");
+  const toInput   = document.getElementById("to_input");
+  const storeId   = <%= @store.id %>;
+  const csrf      = document.querySelector('meta[name="csrf-token"]').content;
+
+  startBtn.addEventListener("click", () => {
+    const from = fromInput.value.trim();
+    const to   = toInput.value.trim();
+    if (!from || !to) { alert("Please enter both a from and to location."); return; }
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = `/stores/${storeId}/scans/start`;
+    [["from", from], ["to", to], ["authenticity_token", csrf]].forEach(([name, value]) => {
+      const input = document.createElement("input");
+      input.type = "hidden"; input.name = name; input.value = value;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  });
+</script>

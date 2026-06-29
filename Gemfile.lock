@@ -227,6 +227,7 @@ GEM
     reline (0.6.3)
       io-console (~> 0.5)
     rexml (3.4.4)
+    rtesseract (3.1.4)
     rubyzip (3.4.1)
     sassc (2.4.0)
       ffi (~> 1.9)
@@ -289,6 +290,7 @@ DEPENDENCIES
   pg (~> 1.1)
   puma (>= 5.0)
   rails (~> 7.1.6)
+  rtesseract
   selenium-webdriver
   sprockets-rails
   stimulus-rails

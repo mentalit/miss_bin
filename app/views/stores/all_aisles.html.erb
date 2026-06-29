@@ -1,1 +1,9 @@
+<%# app/views/stores/all_aisles.html.erb %>
 <h1>All Aisles</h1>
+<div class="row">
+  <% @aisles.each do |num| %>
+    <div class="card col-1">
+      <%= link_to num, store_aisle_path(@store, aisle: num) %>
+    </div>
+  <% end %>
+</div>

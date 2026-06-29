@@ -1,0 +1,38 @@
+<%# app/views/scans/results.html.erb %>
+<div class="container py-4">
+  <h2>Scan Results</h2>
+
+  <% if @errors.empty? %>
+    <div class="alert alert-success fs-5">✅ All scanned locations matched correctly.</div>
+  <% else %>
+    <div class="alert alert-danger">
+      <strong><%= @errors.length %> mismatch<%= @errors.length == 1 ? "" : "es" %> found.</strong>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+          <tr>
+            <th>Location</th>
+            <th>Article Name</th>
+            <th>Expected Art No</th>
+            <th>Detected Art No</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @errors.each do |e| %>
+            <tr class="table-danger">
+              <td class="font-monospace"><%= e["slid_h"] || e[:slid_h] %></td>
+              <td><%= e["artname"] || e[:artname] %></td>
+              <td class="font-monospace"><%= e["expected"] || e[:expected] %></td>
+              <td class="font-monospace"><%= e["detected"] || e[:detected] %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <div class="mt-3">
+    <%= link_to "Scan Another Range", store_scans_path(@store), class: "btn btn-primary" %>
+  </div>
+</div>

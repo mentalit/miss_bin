@@ -1,1 +1,27 @@
-aisle.html.erb
+<%# app/views/stores/aisle.html.erb %>
+<h1>Aisle <%= params[:aisle] %></h1>
+
+<div class="table-responsive">
+  <table class="table table-bordered table-hover">
+    <thead class="table-dark">
+      <tr>
+        <th>Location</th>
+        <th>Art No</th>
+        <th>Article Name</th>
+        <th>Price</th>
+        <th>Loc Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @articles.each do |art| %>
+        <tr>
+          <td class="font-monospace"><%= art.slid_h %></td>
+          <td class="font-monospace"><%= art.artno %></td>
+          <td><%= art.artname %></td>
+          <td><%= art.price1 %></td>
+          <td><%= art.loc_price %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
